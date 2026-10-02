@@ -93,13 +93,14 @@ def parse_email_message(msg_detail: dict) -> dict:
     }
 
 
-def fetch_recent_emails(service, max_results: int = 10) -> list[dict]:
+def fetch_recent_emails(service, max_results: int = 10, days_back: int = 7) -> list[dict]:
     """
     Kéo danh sách email trong vòng 7 ngày gần nhất và bóc tách dữ liệu chuẩn.
 
     Args:
         service: Đối tượng Gmail API Resource đã xác thực.
         max_results (int): Số lượng email tối đa cần lấy (mặc định 10).
+        days_back (int): Chỉ lấy email mới hơn số ngày này (mặc định 7).
 
     Returns:
         list[dict]: Danh sách các dictionary email đã chuẩn hóa.
@@ -107,7 +108,7 @@ def fetch_recent_emails(service, max_results: int = 10) -> list[dict]:
     # Bước 1: Lấy danh sách ID email trong 7 ngày
     response = service.users().messages().list(
         userId="me",
-        q="newer_than:7d",
+        q=f"newer_than:{days_back}d",
         maxResults=max_results
     ).execute()
 

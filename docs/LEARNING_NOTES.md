@@ -139,3 +139,33 @@ Bạn có thể copy đoạn này để tự trả lời và lưu lại:
    - Hàm `parseaddr` giải quyết vấn đề gì? (Tách tên hiển thị và địa chỉ email)
    - Từ khóa `nonlocal` dùng khi nào? (Khi hàm con muốn gán giá trị cho biến ở hàm cha)
 ```
+
+---
+
+## ⚡ TRỤ CỘT 4: BACKEND FASTAPI & LƯU TRỮ TASK (STAGE 2)
+
+### 1. Pydantic là "hợp đồng dữ liệu" của API
+`EmailMessage`, `EmailTask` và `TaskUpdate` quy định chính xác dữ liệu frontend được gửi/nhận. FastAPI dùng chúng để tự kiểm tra enum như `DONE`, tạo schema cho Swagger, và trả lỗi `422` nếu request không hợp lệ. Với cập nhật một phần, `model_dump(exclude_none=True)` chỉ lấy các trường người dùng thực sự muốn đổi.
+
+### 2. REST: chọn đúng endpoint và trạng thái HTTP
+
+| Nghiệp vụ | Endpoint | Kết quả |
+| --- | --- | --- |
+| Liệt kê/lọc task | `GET /api/tasks?status=TODO` | `200` + `{total, tasks}` |
+| Xem một task | `GET /api/tasks/{task_id}` | `200`, hoặc `404` khi không tồn tại |
+| Cập nhật một phần | `PATCH /api/tasks/{task_id}` | Chỉ đổi trường được gửi lên |
+| Đồng bộ Gmail | `POST /api/sync` | Tổng email quét và số task mới |
+
+### 3. Layered architecture trong code này
+`routes/` chỉ chuyển HTTP request/response; `controllers/` điều phối nghiệp vụ; `storage.py` chỉ làm việc với file; `models.py` giữ schema. Nhờ vậy có thể test smart merge mà không gọi Gmail, và có thể thay JSON bằng SQLite mà không cần đổi API route.
+
+### 4. JSON persistence và smart merge
+`TaskStorage.save_all()` tuần tự hóa enum bằng `model_dump(mode="json")`, ghi ra file tạm rồi thay thế file thật. Điều này giảm nguy cơ `tasks.json` hỏng nếu quá trình ghi bị dừng giữa chừng. Khi sync, ID Gmail là `task_id`: ID đã có thì giữ nguyên cả trạng thái, priority, note và hạn chót; chỉ email mới tạo task `TODO`/`MEDIUM`.
+
+### 5. Kiểm thử đã áp dụng
+Test Stage 2 dùng `TemporaryDirectory` nên không chạm dữ liệu thật. Nó kiểm tra: tạo task, lọc theo trạng thái, handler PATCH/404, OpenAPI và đặc biệt là sync lại cùng một email không làm mất `DONE`/notes. Chạy bằng:
+
+```bash
+cd backend
+uv run python -m unittest discover -s tests -v
+```
